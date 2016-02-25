@@ -1,0 +1,54 @@
+create view Number as
+	extract regex /[0-9]+/
+		on D.text as number
+	from Document D;
+
+create view Month as
+	extract regex /December|February|September|October/
+		on D.text as month
+	from Document D;
+
+create view Year as
+	extract regex /2015|2016|2013|2014/
+		on D.text as year
+	from Document D;
+
+create view Author as 
+	extract regex /The Weeknd|Justin Bieber|Drake|Adele/  	
+		on D.text as author
+	from Document D;
+
+create view Name as
+        extract regex /\".*?\"/
+                on D.text as name
+        from Document D;
+
+create view Time as
+        extract pattern (<M.month>) (<N.number>) /,/ (<Y.year>)
+              return group 0 as Time
+                and group 1 as Month
+                and group 2 as Day
+                and group 3 as Year
+        from Month M, Number N, Year Y;
+
+create view Rank as
+        extract pattern /Number/ (<O.number>) /\:/ (<A.author>) (<N.name>)
+              return group 0 as rank
+                and group 1 as order
+                and group 2 as author
+                and group 3 as name
+        from Number O, Author A, Name N;
+
+create view AuthorOnly as
+        select R.author as author
+        from Rank R;
+
+output view Number;
+output view Month;
+output view Year;
+output view Author;
+output view Name;
+output view Time;
+output view Rank;
+output view AuthorOnly;
+

@@ -1,0 +1,66 @@
+create view Number as
+	extract regex /[0-9]+/
+		on D.text as number
+	from Document D;
+
+create view Month as
+	extract regex /February|September|October|April|November|May|July|January|March|June|August/
+		on D.text as month
+	from Document D;
+
+create view Author as
+	extract regex /Zack Snyder|Robert Downey Jr|Marvel Entertainment|Warner Bros|Ben Stiller|Renee Zellweger|Matt Damon/
+		on D.text as author
+	from Document D;
+
+create view Title as 
+	extract regex /Star Wars|Spectre|Jurassic World|Batman|Superman|Suicide Squad|Civil War|Iron Man|Doctor Strange|Deadpool|Gambit|Apocalypse|Fantastic Four|Fantastic Beasts and Where to Find Them|Derek Zoolander|Bridget Jones|Star Trek Beyond|Jason Bourne|Kung Fu Panda 3|Collision Course|Finding Dory|Point Break|Ghostbusters|Pete's Dragon|Ben Hur|The Magnificent Seven/
+		on D.text as title
+	from Document D;
+
+create view Date as
+        extract pattern (<N.number>) (<M.month>)
+              return group 0 as Time
+                and group 1 as Day
+                and group 2 as Month
+        from Month M, Number N;
+
+create view Information as
+        extract pattern (<T.title>) /\(/ (<N.number>) (<M.month>) /\)/
+              return group 0 as Information
+                and group 1 as Movie
+                and group 2 as Day
+                and group 3 as Month
+        from Title T, Number N, Month M;
+
+create view TitleOnly as
+        select I.Movie as Movie
+        from Information I;
+
+create view Appellation as
+        extract regex /who|which|where/
+            on D.text as appellation
+        from Document D;
+
+create view Accident as
+        extract regex /Suicide Squad|see Robert Downey Jr's Iron Man|a little less brain-taxing|multiplex-bound title|the rule/
+            on D.text as accident
+        from Document D;
+        
+create view Sentence as
+    extract pattern (<A.appellation>) <Token>{1,5} (<Ac.accident>)
+        return group 0 as Sentence
+           and group 1 as Appellation
+           and group 2 as Accident
+        from Appellation A, Accident Ac;
+
+output view Number;
+output view Month;
+output view Author;
+output view Title;
+output view Date;
+output view Information;
+output view TitleOnly;
+output view Appellation;
+output view Accident;
+output view Sentence;

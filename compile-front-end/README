@@ -1,0 +1,73 @@
+注意我们的文档分别是在linux和windows下进行编辑的，如果出现了乱码，其中涉及到了ISO-8859-15编码，请使用sublime来打开文档
+
+执行环境：linux 或者是 unix-like环境
+
+执行命令：先进入src上一层目录，然后编译和执行，有两种模式：
+		1.第一种就是 make && ./AQL < data 命令即可；
+		2.第二种就是执行 make，然后执行./AQL,然后输入相应的aql文件的相对路径和你要处理的文件所在相对路径，比如： make && ./AQL < data（data里面包含相应的aql文件的相对路径和你要处理的文件相对路径）
+		3.如果一个aql要处理多篇文章的话，可以先执行make，然后执行./AQL之后输入你的多篇文章的所在的目录，比如：make && ./AQL,然后输入aql文件的相对路径和你要处理的文章的所在的目录,注意目录是相对于当前目录的，而且如果当前有个文件和当前目录同名，那么就会处理同名文件，不会处理目录下的文件。
+
+实现了什么？
+	实现了从文本提取信息，先是实现了文本的分词，然后实现对aql命令的分词，最后利用前面的准备工作在parser里面进行创建view和打印view出来到相应的文件当中去，他们的说明如下：
+
+Tokenizer：
+        1.Document.txt是做为Tokenizer（分词器）的输入的文档
+        2.Tokenizer.h文件中定义了全局变量bool end，用来表示文件读取结束
+        3.分词器不能判断中文字符
+        4.test.cpp可用来测试分词器
+        5.Token的划分规则：以字母或数字组成的无符号分隔的字符串，或者单纯的特殊符号，不包含空白符
+        例如 I‘m 20years old会被划分为 I | ' | m | 20 | years | old而不是 I | ' | m | 20years | old.即，会把连在一起的字母跟数字划分为不同的token,也就是说文章中如果有表示特殊含义的标识符，是用字母跟数字结合在一起表示的话，分词器会将其划分开来，因此，如果该标识符是重要的，需要将其加入到分词器的头文件里，添加一个划分规则
+        7.要求文档中，一个完整的单词的字母间不允许出现分隔，否则分词器会将其划分为不同的token,比如 island 会被划分为一个token，而 is land 则会被划分为两个token
+        8.对于一些既定含义的复合符，比如"&&"、"!="、"<="，该文本分词器暂时没有对其进行特殊处理，即对于"&&"，该分词器会将其划分为两个token，而不是作为具有"且"含义的一个token，若文章中有需要对一些复合符进行特别划分，则再在分词器头文件中另行添加划分规则
+
+        第一次修改：（没有修改分词规则）
+        1.可以对任意多个文件进行读取，但需要输入文件名，当输入“！”时，代表停止对文章的分词操作，退出程序
+        2.可以判断文件是否存在
+        3.如果已经访问到文件末尾了，仍然调用scan函数，会返回一个参数值为Token(-1, -1, "EOF")的token,当然，可以通过判断end的值为true从而不接收这个无效的token
+        4.可以用重定向 ./a.out > test.output 来查看输出结果
+
+        第二次修改：
+        1.修改Tokenizer.h中的Token类为Token_new，以便于区分与lexer.h中的Token类
+        2.给Token_new类增加公有变量long begin, end;用来指示token在文章中的位置 [begin,end)
+        3.修改Token_new类中int line为long line; 考虑到可能会出现文章行数很多的情况
+        4.删除Tokenizer.h中的全局变量end，给Tokenizer类添加一个公有函数bool isEnd();用来判断是否已经读取到文章末尾
+        5.分词器将不再对小数进行判断，即12.3不会再被划分为一个token，而是三个token,[12] [.] [3]
+
+        第三次修改：
+        1.由于Tokenizer类中有动态成员，因此必须添加拷贝构造函数，重新动态分配内存空间
+        2.同时，还重载了赋值操作符 =
+
+        第四次修改：
+        1.为了使类的对象可以访问私有变量增加了公有函数：
+        long getPos()；
+        long getSize()；
+        long getCurline()；
+        char getChar()；
+        char* getBuffer()； // 对于这个函数，在内部是重新申请了一块内存空间并将buffer中存储的值
+                      // 拷贝到这个指针变量里去，然后再返回；因此，对接收到的这个指针指向的
+                      // 内存空间中的值进行修改，不会影响到类的私有变量中bufer中的值
+                      // 当文件不存在时，或文件为空时，调用getBuffer这个函数会返回
+                      // "there is no content in the file!";
+
+        第五次修改：
+        1.将Tokenizer.h的声明跟实现分开，分为Tokenizer.h跟Tokenizer.cpp两个文件
+        2.在Token_new中添加函数getBeginIndex()跟getEndIndex()
+
+        第六次修改：
+        1.给类Token_new添加成员变量to_last_token表示当前token的前一个token的尾端，to_next_token表示当前token的后一个token的头端（其中，一个token在文章中的位置可以表示为[begin, end)，左闭右开的区间，而begin表示token的头端，end表示token的尾端）
+        2.同时增加成员函数getToLastToken()以及getToNextToken()
+        3.修改文档扫描函数，使得当得到一个完整token时，它还可以获得to_last_token以及to_next_token的值。其中，对于第一个token的to_last_token一定是0，最后一个token的to_next_token一定是size-1（buffer的size是比实际有效的文档的size大1的）
+        4.测试时，若修改过Tokenizer.h 则需先  g++ Tokenizer.h,然后g++ -o test test.cpp Tokenizer.cpp,最后./test > test.output,输入后就可以在test.output中看到结果
+        
+Lexer：
+	Lexer是对aql文件的分词，把aql中的关键词、符号、数字和正则表达式提取出来，并记录每一个分词单元的行号，而且每一个分词单元都有一个标签，用来区分不同属性的分词单元
+
+Output.cpp:
+    结合View.h文件,将存在View里面的信息提取出来，而ViewColumn存放的信息是每个View的子列。找到当前子列最长的view，然后统一该列输出长度，依次类推其他子列，最终实现当前View的信息输出。
+
+parser：
+	View.h里面定义了View类和ViewColumn类，View用来储存每个view的所有信息，view又是由ViewColumn来组成，也就每个view当中的列了，然后列里面储存的一行信息，每行信息包括其在原文当中的开始和接收索引以及它的内容。
+
+	inter.h里面定义了一个Atom类，是用来辅助产生式atom→ < column > | < Token > | REG的处理的，其中的< column >和< Token >和REG被储存在一个Atom里面，然后供后面的产生式处理。	
+
+	parser.h里面是根据产生式来实现了对view的创建和利用Output.cpp来打印出View,其中的patternMatcher是用来处理pattern类型的产生式
